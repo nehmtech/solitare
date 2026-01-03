@@ -1,0 +1,564 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Django Solitaire</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            overflow-x: auto;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            text-align: center;
+            color: white;
+            margin-bottom: 20px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+            font-size: 2.5em;
+        }
+
+        .controls {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+        }
+
+        button {
+            padding: 12px 24px;
+            font-size: 16px;
+            font-weight: bold;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        .game-board {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            padding: 30px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+
+        .top-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 40px;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .deck-area {
+            display: flex;
+            gap: 15px;
+        }
+
+        .foundation-area {
+            display: flex;
+            gap: 10px;
+        }
+
+        .pile {
+            width: 100px;
+            height: 140px;
+            border: 2px dashed rgba(255, 255, 255, 0.4);
+            border-radius: 8px;
+            position: relative;
+            background: rgba(255, 255, 255, 0.05);
+            transition: all 0.3s;
+        }
+
+        .pile.drag-over {
+            border-color: #ffd700;
+            background: rgba(255, 215, 0, 0.2);
+            transform: scale(1.05);
+        }
+
+        .pile-label {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: rgba(255, 255, 255, 0.6);
+            font-weight: bold;
+            pointer-events: none;
+            text-align: center;
+            font-size: 14px;
+        }
+
+        .tableau {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .tableau-column {
+            width: 100px;
+            min-height: 200px;
+            position: relative;
+        }
+
+        .card {
+            width: 100px;
+            height: 140px;
+            border-radius: 8px;
+            position: absolute;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            user-select: none;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+        }
+
+        .card:hover {
+            transform: scale(1.05);
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.4);
+            z-index: 100;
+        }
+
+        .card.dragging {
+            opacity: 0.5;
+            cursor: grabbing;
+        }
+
+        .card-back {
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 40px;
+        }
+
+        .card-front {
+            background: white;
+            padding: 8px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .card-front.red {
+            color: #dc3545;
+        }
+
+        .card-front.black {
+            color: #212529;
+        }
+
+        .card-rank {
+            font-size: 24px;
+            font-weight: bold;
+            line-height: 1;
+        }
+
+        .card-suit {
+            font-size: 32px;
+            text-align: center;
+            line-height: 1;
+        }
+
+        .suit-symbol {
+            display: inline-block;
+        }
+
+        .win-message {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+            padding: 40px 60px;
+            border-radius: 20px;
+            box-shadow: 0 10px 50px rgba(0, 0, 0, 0.5);
+            text-align: center;
+            z-index: 1000;
+            animation: bounceIn 0.5s;
+            display: none;
+        }
+
+        .win-message.show {
+            display: block;
+        }
+
+        .win-message h2 {
+            font-size: 3em;
+            margin-bottom: 20px;
+        }
+
+        @keyframes bounceIn {
+            0% {
+                transform: translate(-50%, -50%) scale(0.3);
+                opacity: 0;
+            }
+            50% {
+                transform: translate(-50%, -50%) scale(1.05);
+            }
+            100% {
+                transform: translate(-50%, -50%) scale(1);
+                opacity: 1;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .card, .pile {
+                width: 80px;
+                height: 112px;
+            }
+
+            .tableau-column {
+                width: 80px;
+            }
+
+            .card-rank {
+                font-size: 20px;
+            }
+
+            .card-suit {
+                font-size: 28px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎴 Django Solitaire 🎴</h1>
+        
+        <div class="controls">
+            <button onclick="newGame()">New Game</button>
+            <button onclick="autoMove()">Auto Move</button>
+            <button onclick="drawCard()">Draw Card</button>
+        </div>
+
+        <div class="game-board">
+            <div class="top-row">
+                <div class="deck-area">
+                    <div class="pile" id="deck-pile" onclick="drawCard()">
+                        <div class="pile-label">DECK<br><span id="deck-count">0</span></div>
+                    </div>
+                    <div class="pile" id="waste-pile" data-pile="waste">
+                        <div class="pile-label">WASTE</div>
+                    </div>
+                </div>
+
+                <div class="foundation-area">
+                    <div class="pile" data-pile="foundation_hearts">
+                        <div class="pile-label">♥</div>
+                    </div>
+                    <div class="pile" data-pile="foundation_diamonds">
+                        <div class="pile-label">♦</div>
+                    </div>
+                    <div class="pile" data-pile="foundation_clubs">
+                        <div class="pile-label">♣</div>
+                    </div>
+                    <div class="pile" data-pile="foundation_spades">
+                        <div class="pile-label">♠</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="tableau" id="tableau">
+                <!-- Tableau columns will be generated here -->
+            </div>
+        </div>
+
+        <div class="win-message" id="win-message">
+            <h2>🎉 You Win! 🎉</h2>
+            <p style="font-size: 1.5em; margin-bottom: 20px;">Congratulations!</p>
+            <button onclick="newGame()">Play Again</button>
+        </div>
+    </div>
+
+    <script>
+        let gameState = null;
+        let draggedCard = null;
+        let draggedFrom = null;
+        let draggedIndex = null;
+
+        // Suit symbols
+        const SUIT_SYMBOLS = {
+            'hearts': '♥',
+            'diamonds': '♦',
+            'clubs': '♣',
+            'spades': '♠'
+        };
+
+        // Initialize game on page load
+        window.onload = function() {
+            loadGameState();
+        };
+
+        // Load current game state
+        function loadGameState() {
+            fetch('/api/game-state/')
+                .then(response => response.json())
+                .then(data => {
+                    gameState = data;
+                    renderGame();
+                })
+                .catch(error => console.error('Error loading game:', error));
+        }
+
+        // Start new game
+        function newGame() {
+            fetch('/api/new-game/')
+                .then(response => response.json())
+                .then(data => {
+                    gameState = data;
+                    renderGame();
+                    document.getElementById('win-message').classList.remove('show');
+                })
+                .catch(error => console.error('Error starting new game:', error));
+        }
+
+        // Draw card from deck
+        function drawCard() {
+            fetch('/api/draw-card/')
+                .then(response => response.json())
+                .then(data => {
+                    gameState = data;
+                    renderGame();
+                })
+                .catch(error => console.error('Error drawing card:', error));
+        }
+
+        // Auto move cards to foundations
+        function autoMove() {
+            fetch('/api/auto-move/')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.moved) {
+                        gameState = data.state;
+                        renderGame();
+                        // Try again if a card was moved
+                        setTimeout(autoMove, 300);
+                    }
+                })
+                .catch(error => console.error('Error auto-moving:', error));
+        }
+
+        // Move card via API
+        function moveCard(from, to, cardIndex = null) {
+            const payload = {
+                from: from,
+                to: to
+            };
+            if (cardIndex !== null) {
+                payload.card_index = cardIndex;
+            }
+
+            fetch('/api/move-card/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(payload)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    gameState = data.state;
+                    renderGame();
+                } else {
+                    alert('Invalid move!');
+                }
+            })
+            .catch(error => console.error('Error moving card:', error));
+        }
+
+        // Render the entire game
+        function renderGame() {
+            if (!gameState) return;
+
+            // Update deck count
+            document.getElementById('deck-count').textContent = gameState.deck_count;
+
+            // Render waste pile
+            renderPile('waste-pile', gameState.waste, 'waste');
+
+            // Render foundations
+            renderPile('[data-pile="foundation_hearts"]', gameState.foundations.hearts, 'foundation_hearts');
+            renderPile('[data-pile="foundation_diamonds"]', gameState.foundations.diamonds, 'foundation_diamonds');
+            renderPile('[data-pile="foundation_clubs"]', gameState.foundations.clubs, 'foundation_clubs');
+            renderPile('[data-pile="foundation_spades"]', gameState.foundations.spades, 'foundation_spades');
+
+            // Render tableau
+            renderTableau();
+
+            // Check for win
+            if (gameState.is_won) {
+                setTimeout(() => {
+                    document.getElementById('win-message').classList.add('show');
+                }, 500);
+            }
+        }
+
+        // Render a single pile
+        function renderPile(selector, cards, pileName) {
+            const pile = document.querySelector(selector);
+            if (!pile) return;
+
+            // Clear existing cards
+            const existingCards = pile.querySelectorAll('.card');
+            existingCards.forEach(card => card.remove());
+
+            // Render cards
+            if (cards && cards.length > 0) {
+                const topCard = cards[cards.length - 1];
+                const cardElement = createCardElement(topCard, pileName, cards.length - 1);
+                pile.appendChild(cardElement);
+            }
+        }
+
+        // Render tableau columns
+        function renderTableau() {
+            const tableau = document.getElementById('tableau');
+            tableau.innerHTML = '';
+
+            for (let col = 0; col < 7; col++) {
+                const column = document.createElement('div');
+                column.className = 'tableau-column';
+                column.dataset.pile = `tableau_${col}`;
+                
+                const cards = gameState.tableau[col];
+                
+                cards.forEach((card, index) => {
+                    const cardElement = createCardElement(card, `tableau_${col}`, index);
+                    cardElement.style.top = `${index * 30}px`;
+                    column.appendChild(cardElement);
+                });
+
+                // Make empty columns droppable
+                if (cards.length === 0) {
+                    column.style.minHeight = '140px';
+                    column.style.border = '2px dashed rgba(255, 255, 255, 0.3)';
+                    column.style.borderRadius = '8px';
+                }
+
+                setupDropZone(column);
+                tableau.appendChild(column);
+            }
+        }
+
+        // Create a card element
+        function createCardElement(card, pileName, cardIndex) {
+            const cardDiv = document.createElement('div');
+            cardDiv.className = 'card';
+            cardDiv.dataset.pile = pileName;
+            cardDiv.dataset.index = cardIndex;
+
+            if (card.face_up) {
+                cardDiv.innerHTML = `
+                    <div class="card-front ${card.color}">
+                        <div class="card-rank">${card.rank}</div>
+                        <div class="card-suit">${SUIT_SYMBOLS[card.suit]}</div>
+                        <div class="card-rank" style="transform: rotate(180deg);">${card.rank}</div>
+                    </div>
+                `;
+                
+                // Make face-up cards draggable
+                cardDiv.draggable = true;
+                cardDiv.addEventListener('dragstart', handleDragStart);
+                cardDiv.addEventListener('dragend', handleDragEnd);
+            } else {
+                cardDiv.innerHTML = '<div class="card-back">🂠</div>';
+                cardDiv.draggable = false;
+            }
+
+            return cardDiv;
+        }
+
+        // Drag and drop handlers
+        function handleDragStart(e) {
+            draggedCard = e.target;
+            draggedFrom = e.target.dataset.pile;
+            draggedIndex = parseInt(e.target.dataset.index);
+            
+            e.target.classList.add('dragging');
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/html', e.target.innerHTML);
+        }
+
+        function handleDragEnd(e) {
+            e.target.classList.remove('dragging');
+            
+            // Remove drag-over class from all piles
+            document.querySelectorAll('.pile, .tableau-column').forEach(pile => {
+                pile.classList.remove('drag-over');
+            });
+        }
+
+        function setupDropZone(element) {
+            element.addEventListener('dragover', handleDragOver);
+            element.addEventListener('drop', handleDrop);
+            element.addEventListener('dragleave', handleDragLeave);
+        }
+
+        function handleDragOver(e) {
+            if (e.preventDefault) {
+                e.preventDefault();
+            }
+            e.dataTransfer.dropEffect = 'move';
+            e.currentTarget.classList.add('drag-over');
+            return false;
+        }
+
+        function handleDragLeave(e) {
+            e.currentTarget.classList.remove('drag-over');
+        }
+
+        function handleDrop(e) {
+            if (e.stopPropagation) {
+                e.stopPropagation();
+            }
+            e.preventDefault();
+
+            const dropTarget = e.currentTarget;
+            const targetPile = dropTarget.dataset.pile;
+
+            if (draggedFrom && targetPile && draggedFrom !== targetPile) {
+                moveCard(draggedFrom, targetPile, draggedIndex);
+            }
+
+            dropTarget.classList.remove('drag-over');
+            return false;
+        }
+
+        // Setup drop zones for existing piles
+        document.querySelectorAll('.pile').forEach(pile => {
+            setupDropZone(pile);
+        });
+    </script>
+</body>
+</html>
